@@ -2,6 +2,81 @@ export type TrackId = 'none' | 'intro' | 'background' | 'battle';
 
 const MUTE_KEY = 'sansad-showdown:muted-v1';
 
+const AUDIO_ASSETS: Record<string, string> = {
+  // Music
+  'music:intro': '/assets/intro-CxITfm7k.mp3',
+  'music:background': '/assets/background-sFl8lOjr.mp3',
+  'music:battle': '/assets/battle-CqvMijZR.mp3',
+
+  // Announcements
+  'voice:round_1': '/assets/round_1-4pTCkOAK.mp3',
+  'voice:round_2': '/assets/round_2-BIyjSuFz.mp3',
+  'voice:final_round': '/assets/final_round-2ps4Gt_y.mp3',
+  'voice:fight': '/assets/fight-BTHw9nHH.mp3',
+  'voice:ko': '/assets/ko-CYX5YdIq.mp3',
+  'voice:you_win': '/assets/you_win-DHsvvWFw.mp3',
+  'voice:you_lose': '/assets/you_lose-mLbO-eAT.mp3',
+  'voice:time_up': '/assets/time_up-Carf_3Z9.mp3',
+  'voice:perfect': '/assets/perfect-Dm5Oy3HT.mp3',
+
+  // Character Voices
+  'char:modi': '/assets/modi-R8FpxZEb.mp3',
+  'char:rahul': '/assets/rahul-C7Jjp4hs.mp3',
+  'char:didi': '/assets/didi-CjTHLKgc.mp3',
+  'char:trump': '/assets/trump-Czs6_rQc.mp3',
+  'char:yogi': '/assets/yogi-CJEN4Csa.mp3',
+  'char:nitin': '/assets/nitin-B2ZG9HV5.mp3',
+  'char:mbapu': '/assets/mbapu-D85PVY1T.mp3',
+  'char:ravi': '/assets/ravi-BUhOMgaW.mp3',
+  'char:lalu': '/assets/lalu-vVsgGZuo.mp3',
+  'char:amit': '/assets/amit-DJ24Mt8b.mp3',
+  'char:dhruv': '/assets/dhruv-CHzIxkIz.mp3',
+  'char:nirmala': '/assets/nirmala-Dq7cz8UN.mp3',
+  'char:mbapuintro': '/assets/mbapuintro-BI_jQwTJ.mp3',
+  'char:raviwin': '/assets/raviwin-Q4j69frZ.mp3',
+  'char:amitwin': '/assets/amitwin-DIIUm105.mp3',
+  'char:gulaam': '/assets/gulaam-BnDUPSAr.mp3',
+
+  // Sound Effects
+  'sfx:ui_select': '/assets/ui_select-DvWPzIZM.mp3',
+  'sfx:ui_confirm': '/assets/ui_confirm-DEEar_Kj.mp3',
+  'sfx:bomb': '/assets/bomb-1fSoTLVm.mp3',
+  'sfx:boom': '/assets/boom-Brg2wdT5.mp3',
+  'sfx:bell': '/assets/bell-DW1wbKh0.mp3',
+  'sfx:moo': '/assets/moo-C_6f5G0B.mp3',
+  'sfx:pataka': '/assets/pataka-DtLTRxFJ.mp3',
+  'sfx:kaching': '/assets/kaching-wbD5pe6-.mp3',
+  'sfx:metal_crunch': '/assets/metal_crunch-DdbVoplE.mp3',
+  'sfx:thunder': '/assets/thunder-BRWemNyY.mp3',
+  'sfx:coins': '/assets/coins-DVYyL0Kv.mp3',
+  'sfx:charkha': '/assets/charkha-ze2BHoz_.mp3',
+  'sfx:camera_clicks': '/assets/camera_clicks-DJHuyBDj.mp3',
+  'sfx:shimmer': '/assets/shimmer-XQUc4lgS.mp3',
+  'sfx:stamp_slam': '/assets/stamp_slam-CAslQB_C.mp3',
+  'sfx:reverse_beeps': '/assets/reverse_beeps-DaQ4ZZDr.mp3',
+  'sfx:chai_ting': '/assets/chai_ting-Q1sP8TcN.mp3',
+  'sfx:cup_break': '/assets/cup_break-BgaQYkuS.mp3',
+  'sfx:crate_crash': '/assets/crate_crash-Cr6VTWOz.mp3',
+  'sfx:drone': '/assets/drone-DhDpKSwO.mp3',
+  'sfx:engine_loop': '/assets/engine_loop-D0YGxkt_.mp3',
+  'sfx:eye_zing': '/assets/eye_zing-qZiVqGmG.mp3',
+  'sfx:news_sting': '/assets/news_sting-C-mndS4t.mp3',
+  'sfx:poof': '/assets/poof-BlJFjDeg.mp3',
+  'sfx:charge_chakra': '/assets/charge_chakra-1s5EOYKm.mp3',
+  'sfx:release_chakra': '/assets/release_chakra-BvOYn27E.mp3',
+  'sfx:release_bulldozer': '/assets/release_bulldozer-CyubjB_l.mp3',
+  'sfx:bed_bulldozer': '/assets/bed_bulldozer-BE_e8yDo.mp3',
+  'sfx:release_jadu': '/assets/release_jadu-BVQ3aIZ7.mp3',
+  'sfx:bed_jadu': '/assets/bed_jadu-jl3ElSBF.mp3',
+  'sfx:release_tariff': '/assets/release_tariff-DZ1JBEzs.mp3',
+  'sfx:bed_tariff': '/assets/bed_tariff-CLVTzIAp.mp3',
+  'sfx:aloolelo': '/assets/aloolelo-BopBNjJr.mp3',
+  'sfx:cow_bell': '/assets/cow_bell-Cj3rAWh8.mp3',
+  'sfx:horn_long': '/assets/horn_long-dLtoq4Pf.mp3',
+  'sfx:jingle_win': '/assets/jingle_win-DqlQ62Fq.mp3',
+  'sfx:jingle_lose': '/assets/jingle_lose-gAS4mNKd.mp3',
+};
+
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -12,8 +87,10 @@ export class SoundEngine {
   muted = false;
   musicOn = true;
   private track: TrackId = 'none';
-  private musicTimer: number | null = null;
-  private stepIdx = 0;
+  private currentMusicEl: HTMLAudioElement | null = null;
+  private voiceEl: HTMLAudioElement | null = null;
+  private sfxPool: HTMLAudioElement[] = [];
+
   private engineOsc: { osc: OscillatorNode; gain: GainNode } | null = null;
   private droneOsc: { osc: OscillatorNode; gain: GainNode } | null = null;
   onStateChange: (() => void) | null = null;
@@ -27,8 +104,13 @@ export class SoundEngine {
   }
 
   unlock(): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
     if (!this.ctx) {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AC =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
       this.ctx = new AC();
       const comp = this.ctx.createDynamicsCompressor();
@@ -42,24 +124,21 @@ export class SoundEngine {
       this.sfxBus.connect(this.master);
 
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.musicOn ? 0.16 : 0;
+      this.musicGain.gain.value = this.musicOn ? 0.35 : 0;
       this.musicGain.connect(this.master);
 
-      this.noiseBuf = this.buildNoiseBuffer(0.6);
-      this.startSequencer();
-    }
-    if (this.ctx && this.ctx.state !== 'running') {
-      this.ctx.resume().then(() => this.onStateChange?.()).catch(() => {});
+      this.initNoise();
     }
   }
 
-  private buildNoiseBuffer(sec: number): AudioBuffer {
-    const ctx = this.ctx!;
-    const len = Math.floor(ctx.sampleRate * sec);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
-    return buf;
+  private initNoise(): void {
+    if (!this.ctx) return;
+    const len = this.ctx.sampleRate * 1.5;
+    this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      d[i] = Math.random() * 2 - 1;
+    }
   }
 
   toggleMute(): boolean {
@@ -69,321 +148,298 @@ export class SoundEngine {
 
   setMuted(val: boolean): void {
     this.muted = val;
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(val ? 0 : 0.72, this.ctx.currentTime, 0.02);
-    }
     try {
       localStorage.setItem(MUTE_KEY, val ? '1' : '0');
     } catch {}
+
+    if (this.master) {
+      this.master.gain.value = val ? 0 : 0.72;
+    }
+    if (this.currentMusicEl) {
+      this.currentMusicEl.muted = val;
+    }
     this.onStateChange?.();
   }
 
   toggleMusic(): boolean {
     this.musicOn = !this.musicOn;
-    if (this.musicGain && this.ctx) {
-      this.musicGain.gain.setTargetAtTime(this.musicOn ? 0.16 : 0, this.ctx.currentTime, 0.08);
+    if (this.currentMusicEl) {
+      if (this.musicOn) {
+        this.currentMusicEl.play().catch(() => {});
+      } else {
+        this.currentMusicEl.pause();
+      }
     }
-    this.onStateChange?.();
     return this.musicOn;
   }
 
   setTrack(id: TrackId): void {
+    if (this.track === id) return;
     this.track = id;
-    this.stepIdx = 0;
-  }
 
-  private startSequencer(): void {
-    if (this.musicTimer !== null) return;
-    const scaleMenu = [220, 261.6, 293.7, 329.6, 392, 440, 392, 329.6];
-    const scaleBattle = [146.8, 174.6, 196, 220, 261.6, 220, 196, 174.6];
-    const bassBattle = [73.4, 73.4, 87.3, 87.3, 98, 98, 110, 98];
+    if (this.currentMusicEl) {
+      this.currentMusicEl.pause();
+      this.currentMusicEl = null;
+    }
 
-    this.musicTimer = window.setInterval(() => {
-      if (!this.ctx || !this.musicGain || this.muted || !this.musicOn || this.ctx.state !== 'running') return;
-      if (this.track === 'none') return;
+    if (id === 'none') return;
 
-      const t = this.ctx.currentTime;
-      const step = this.stepIdx++ % 16;
-
-      if (this.track === 'intro' || this.track === 'background') {
-        const freq = scaleMenu[step % scaleMenu.length];
-        if (step % 2 === 0) this.musicNote(freq, 'triangle', 0.22, 0.25, t);
-        if (step % 4 === 0) this.musicNote(freq * 0.5, 'sine', 0.35, 0.35, t);
-      } else if (this.track === 'battle') {
-        // Energetic tabla-style pulse + sitar/synth riff
-        const bFreq = bassBattle[Math.floor(step / 2) % bassBattle.length];
-        if (step % 2 === 0) this.musicNote(bFreq, 'sawtooth', 0.16, 0.28, t, 500);
-        if (step % 4 === 0) this.musicNote(110, 'sine', 0.08, 0.5, t, undefined, 48);
-        if (step % 4 === 2) this.musicNoise(0.06, 0.18, t, 1800);
-        if (step % 2 === 1 || step % 4 === 0) {
-          const mFreq = scaleBattle[step % scaleBattle.length] * 2;
-          this.musicNote(mFreq, 'square', 0.11, 0.12, t, 1400);
-        }
+    const url = AUDIO_ASSETS[`music:${id}`];
+    if (url) {
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.volume = id === 'battle' ? 0.45 : 0.55;
+      audio.muted = this.muted;
+      this.currentMusicEl = audio;
+      if (this.musicOn) {
+        audio.play().catch(() => {});
       }
-    }, 155);
-  }
-
-  private musicNote(
-    freq: number,
-    type: OscillatorType,
-    dur: number,
-    vol: number,
-    at: number,
-    lpFreq?: number,
-    slideTo?: number
-  ): void {
-    if (!this.ctx || !this.musicGain) return;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, at);
-    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, at + dur);
-    g.gain.setValueAtTime(0.001, at);
-    g.gain.linearRampToValueAtTime(vol, at + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.001, at + dur);
-    if (lpFreq) {
-      const f = this.ctx.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.value = lpFreq;
-      osc.connect(f).connect(g).connect(this.musicGain);
-    } else {
-      osc.connect(g).connect(this.musicGain);
     }
-    osc.start(at);
-    osc.stop(at + dur + 0.02);
   }
 
-  private musicNoise(dur: number, vol: number, at: number, hpFreq: number): void {
-    if (!this.ctx || !this.musicGain || !this.noiseBuf) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuf;
-    const f = this.ctx.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = hpFreq;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(vol, at);
-    g.gain.exponentialRampToValueAtTime(0.001, at + dur);
-    src.connect(f).connect(g).connect(this.musicGain);
-    src.start(at);
-    src.stop(at + dur + 0.02);
+  playAudio(assetKey: string, volume = 0.8): void {
+    if (this.muted) return;
+    const url = AUDIO_ASSETS[assetKey];
+    if (!url) return;
+
+    try {
+      const audio = new Audio(url);
+      audio.volume = Math.max(0, Math.min(1, volume));
+      audio.play().catch(() => {});
+    } catch {}
   }
 
-  private tone(
-    freq: number,
-    endFreq: number,
-    dur: number,
-    type: OscillatorType = 'triangle',
-    gain = 0.25,
-    delay = 0
-  ): void {
-    if (!this.ctx || !this.sfxBus || this.muted || this.ctx.state !== 'running') return;
-    const at = this.ctx.currentTime + delay;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(Math.max(20, freq), at);
-    if (endFreq !== freq) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), at + dur);
-    g.gain.setValueAtTime(0.001, at);
-    g.gain.linearRampToValueAtTime(gain, at + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.001, at + dur);
-    osc.connect(g).connect(this.sfxBus);
-    osc.start(at);
-    osc.stop(at + dur + 0.02);
+  playVoice(charId: string): void {
+    if (this.muted) return;
+    const url = AUDIO_ASSETS[`char:${charId}`];
+    if (!url) return;
+
+    try {
+      if (this.voiceEl) {
+        this.voiceEl.pause();
+      }
+      this.voiceEl = new Audio(url);
+      this.voiceEl.volume = 0.9;
+      this.voiceEl.play().catch(() => {});
+    } catch {}
   }
 
-  private noise(dur: number, gain = 0.25, filterFreq = 900, filterType: BiquadFilterType = 'bandpass', delay = 0): void {
-    if (!this.ctx || !this.sfxBus || !this.noiseBuf || this.muted || this.ctx.state !== 'running') return;
-    const at = this.ctx.currentTime + delay;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuf;
-    const flt = this.ctx.createBiquadFilter();
-    flt.type = filterType;
-    flt.frequency.value = filterFreq;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, at);
-    g.gain.exponentialRampToValueAtTime(0.001, at + dur);
-    src.connect(flt).connect(g).connect(this.sfxBus);
-    src.start(at);
-    src.stop(at + dur + 0.02);
-  }
-
+  // UI Sounds
   uiTap(): void {
-    this.tone(620, 740, 0.05, 'sine', 0.16);
-  }
-  uiSelect(): void {
-    this.tone(520, 680, 0.07, 'triangle', 0.2);
-  }
-  uiConfirm(): void {
-    this.tone(520, 520, 0.09, 'triangle', 0.25, 0);
-    this.tone(780, 780, 0.14, 'triangle', 0.26, 0.07);
-  }
-  uiBack(): void {
-    this.tone(480, 310, 0.1, 'triangle', 0.2);
-  }
-  whoosh(): void {
-    this.noise(0.14, 0.22, 1200, 'bandpass');
-  }
-  hit(power = 0.7): void {
-    this.tone(170 * (0.9 + Math.random() * 0.2), 45, 0.14 + power * 0.08, 'sawtooth', Math.min(0.45, 0.24 + power * 0.16));
-    this.noise(0.11, Math.min(0.4, 0.2 + power * 0.15), 750, 'lowpass');
-  }
-  block(): void {
-    this.tone(420, 210, 0.09, 'square', 0.22);
-    this.noise(0.06, 0.18, 2400, 'highpass');
-  }
-  thud(): void {
-    this.tone(110, 38, 0.18, 'sine', 0.42);
-  }
-  boom(): void {
-    this.tone(140, 28, 0.55, 'sawtooth', 0.5);
-    this.noise(0.55, 0.48, 320, 'lowpass');
-  }
-  bombBlast(): void {
-    this.boom();
-    this.noise(0.4, 0.35, 1600, 'bandpass', 0.05);
-  }
-  pataka(): void {
-    this.noise(0.12, 0.32, 2200, 'highpass');
-    this.tone(320, 90, 0.14, 'square', 0.22, 0.02);
-  }
-  slap(): void {
-    this.noise(0.08, 0.38, 1900, 'bandpass');
-  }
-  snap(): void {
-    this.tone(980, 520, 0.05, 'triangle', 0.25);
-  }
-  poof(): void {
-    this.noise(0.22, 0.26, 650, 'lowpass');
-  }
-  plop(): void {
-    this.tone(240, 520, 0.09, 'sine', 0.25);
-  }
-  frogCroak(): void {
-    this.tone(190, 290, 0.12, 'sawtooth', 0.24);
-    this.tone(210, 320, 0.12, 'sawtooth', 0.22, 0.16);
-  }
-  chaiTing(): void {
-    this.tone(1480, 1460, 0.35, 'sine', 0.28);
-    this.tone(2220, 2200, 0.28, 'sine', 0.14, 0.03);
-  }
-  cupBreak(): void {
-    this.noise(0.15, 0.3, 3500, 'highpass');
-    this.tone(1800, 900, 0.08, 'triangle', 0.2);
-  }
-  moo(): void {
-    this.tone(145, 118, 0.65, 'sawtooth', 0.24);
-  }
-  cowBell(): void {
-    this.tone(680, 670, 0.22, 'square', 0.16);
-  }
-  newsSting(): void {
-    this.tone(660, 660, 0.09, 'square', 0.18, 0);
-    this.tone(880, 880, 0.16, 'square', 0.2, 0.09);
-  }
-  cameraClicks(count = 4): void {
-    for (let i = 0; i < Math.min(6, count); i++) {
-      this.noise(0.03, 0.14, 4200, 'highpass', i * 0.07);
-    }
-  }
-  kaching(): void {
-    this.tone(1320, 1320, 0.08, 'triangle', 0.24, 0);
-    this.tone(1760, 1760, 0.28, 'sine', 0.28, 0.07);
-  }
-  coins(n = 6): void {
-    for (let i = 0; i < Math.min(5, n); i++) {
-      this.tone(2200 + i * 180, 2400 + i * 180, 0.08, 'sine', 0.12, i * 0.04);
-    }
-  }
-  stampSlam(): void {
-    this.tone(150, 42, 0.22, 'triangle', 0.48);
-    this.noise(0.15, 0.3, 500, 'lowpass');
-  }
-  crateCrash(): void {
-    this.noise(0.24, 0.38, 850, 'bandpass');
-    this.tone(130, 50, 0.2, 'sawtooth', 0.3);
-  }
-  eyeZing(): void {
-    this.tone(620, 1650, 0.22, 'sine', 0.26);
-  }
-  shimmer(): void {
-    this.tone(880, 1320, 0.35, 'sine', 0.2);
-    this.tone(1100, 1660, 0.35, 'triangle', 0.16, 0.08);
-  }
-  bell(): void {
-    this.tone(880, 875, 0.6, 'sine', 0.28);
-  }
-  thunder(): void {
-    this.noise(0.8, 0.45, 260, 'lowpass');
-  }
-  horn(dur = 0.5): void {
-    this.tone(290, 285, dur, 'sawtooth', 0.28);
-    this.tone(365, 360, dur, 'sawtooth', 0.24);
-  }
-  metalCrunch(): void {
-    this.noise(0.22, 0.36, 1500, 'bandpass');
-  }
-  bark(): void {
-    this.tone(360, 160, 0.12, 'sawtooth', 0.24);
-  }
-  heartbeat(): void {
-    this.tone(68, 40, 0.12, 'sine', 0.38, 0);
-    this.tone(64, 38, 0.14, 'sine', 0.32, 0.16);
-  }
-  drumroll(): void {
-    for (let i = 0; i < 12; i++) {
-      this.noise(0.04, 0.14, 1400, 'bandpass', i * 0.06);
-    }
-  }
-  reverseBeeps(n = 4): void {
-    for (let i = 0; i < Math.min(4, n); i++) {
-      this.tone(1100, 1100, 0.14, 'square', 0.18, i * 0.32);
-    }
-  }
-  penScribble(): void {
-    this.noise(0.18, 0.14, 2400, 'bandpass');
+    this.playTone(520, 0.04, 'sine', 0.12);
   }
 
+  uiSelect(): void {
+    this.playAudio('sfx:ui_select', 0.7);
+  }
+
+  uiConfirm(): void {
+    this.playAudio('sfx:ui_confirm', 0.85);
+  }
+
+  uiBack(): void {
+    this.playTone(340, 0.08, 'sine', 0.18);
+  }
+
+  // Combat SFX
+  whoosh(): void {
+    this.playNoise(0.09, 320, 0.22);
+  }
+
+  hit(power = 0.7): void {
+    const p = Math.max(0.2, Math.min(1.4, power));
+    this.playNoise(0.12 * p, 450, 0.35 * p);
+    this.playTone(110 / p, 0.08, 'sawtooth', 0.28 * p);
+  }
+
+  block(): void {
+    this.playTone(480, 0.05, 'triangle', 0.25);
+    this.playTone(240, 0.09, 'sine', 0.2);
+  }
+
+  thud(): void {
+    this.playNoise(0.14, 180, 0.3);
+    this.playTone(85, 0.12, 'sine', 0.25);
+  }
+
+  boom(): void {
+    this.playAudio('sfx:boom', 0.8);
+  }
+
+  bombBlast(): void {
+    this.playAudio('sfx:bomb', 0.85);
+  }
+
+  pataka(): void {
+    this.playAudio('sfx:pataka', 0.8);
+  }
+
+  slap(): void {
+    this.hit(0.85);
+  }
+
+  snap(): void {
+    this.playTone(1800, 0.02, 'square', 0.2);
+  }
+
+  poof(): void {
+    this.playAudio('sfx:poof', 0.7);
+  }
+
+  plop(): void {
+    this.playTone(280, 0.08, 'sine', 0.22);
+  }
+
+  frogCroak(): void {
+    this.playTone(140, 0.12, 'sawtooth', 0.25);
+  }
+
+  chaiTing(): void {
+    this.playAudio('sfx:chai_ting', 0.75);
+  }
+
+  cupBreak(): void {
+    this.playAudio('sfx:cup_break', 0.8);
+  }
+
+  moo(): void {
+    this.playAudio('sfx:moo', 0.85);
+  }
+
+  cowBell(): void {
+    this.playAudio('sfx:cow_bell', 0.75);
+  }
+
+  newsSting(): void {
+    this.playAudio('sfx:news_sting', 0.8);
+  }
+
+  cameraClicks(count = 4): void {
+    this.playAudio('sfx:camera_clicks', 0.75);
+  }
+
+  kaching(): void {
+    this.playAudio('sfx:kaching', 0.8);
+  }
+
+  coins(n = 6): void {
+    this.playAudio('sfx:coins', 0.75);
+  }
+
+  stampSlam(): void {
+    this.playAudio('sfx:stamp_slam', 0.8);
+  }
+
+  crateCrash(): void {
+    this.playAudio('sfx:crate_crash', 0.85);
+  }
+
+  eyeZing(): void {
+    this.playAudio('sfx:eye_zing', 0.75);
+  }
+
+  shimmer(): void {
+    this.playAudio('sfx:shimmer', 0.7);
+  }
+
+  bell(): void {
+    this.playAudio('sfx:bell', 0.8);
+  }
+
+  thunder(): void {
+    this.playAudio('sfx:thunder', 0.85);
+  }
+
+  horn(dur = 0.5): void {
+    this.playAudio('sfx:horn_long', 0.8);
+  }
+
+  metalCrunch(): void {
+    this.playAudio('sfx:metal_crunch', 0.85);
+  }
+
+  bark(): void {
+    this.playTone(260, 0.08, 'sawtooth', 0.28);
+  }
+
+  heartbeat(): void {
+    this.playTone(65, 0.12, 'sine', 0.35);
+  }
+
+  drumroll(): void {
+    this.playNoise(0.5, 300, 0.25);
+  }
+
+  reverseBeeps(n = 4): void {
+    this.playAudio('sfx:reverse_beeps', 0.75);
+  }
+
+  penScribble(): void {
+    this.playNoise(0.18, 1200, 0.2);
+  }
+
+  // Voice Announcer
   announce(what: string): void {
-    if (what === 'fight' || what === 'ko') {
-      this.tone(320, 640, 0.25, 'sawtooth', 0.3);
-      this.noise(0.18, 0.25, 1100, 'bandpass');
-    } else if (what === 'perfect') {
-      this.matchJingle(true);
-    } else {
-      this.tone(440, 560, 0.18, 'triangle', 0.25);
+    const key = what.toLowerCase().trim();
+    if (key.includes('round 1')) {
+      this.playAudio('voice:round_1', 0.95);
+    } else if (key.includes('round 2')) {
+      this.playAudio('voice:round_2', 0.95);
+    } else if (key.includes('final round')) {
+      this.playAudio('voice:final_round', 0.95);
+    } else if (key === 'fight' || key.includes('fight')) {
+      this.playAudio('voice:fight', 0.95);
+    } else if (key.includes('k.o') || key.includes('ko')) {
+      this.playAudio('voice:ko', 0.95);
+    } else if (key.includes('you win')) {
+      this.playAudio('voice:you_win', 0.95);
+    } else if (key.includes('you lose')) {
+      this.playAudio('voice:you_lose', 0.95);
+    } else if (key.includes('time')) {
+      this.playAudio('voice:time_up', 0.95);
+    } else if (key.includes('perfect')) {
+      this.playAudio('voice:perfect', 0.95);
     }
   }
 
   matchJingle(win: boolean): void {
-    const notes = win ? [523.2, 659.3, 784, 1046.5] : [392, 349.2, 311.1, 261.6];
-    notes.forEach((f, i) => this.tone(f, f, 0.22, 'triangle', 0.28, i * 0.12));
+    this.playAudio(win ? 'sfx:jingle_win' : 'sfx:jingle_lose', 0.85);
   }
 
-  startSuperBed(): void {
-    this.tone(160, 480, 1.2, 'sawtooth', 0.22);
+  startSuperBed(type: 'chakra' | 'bulldozer' | 'jadu' | 'tariff' = 'chakra'): void {
+    if (type === 'chakra') {
+      this.playAudio('sfx:bed_chakra', 0.75);
+    } else if (type === 'bulldozer') {
+      this.playAudio('sfx:bed_bulldozer', 0.75);
+    } else if (type === 'jadu') {
+      this.playAudio('sfx:bed_jadu', 0.75);
+    } else if (type === 'tariff') {
+      this.playAudio('sfx:bed_tariff', 0.75);
+    }
   }
+
   stopSuperBed(): void {}
-  superRelease(): void {
-    this.boom();
-    this.shimmer();
+
+  superRelease(type: 'chakra' | 'bulldozer' | 'jadu' | 'tariff' = 'chakra'): void {
+    if (type === 'chakra') {
+      this.playAudio('sfx:release_chakra', 0.85);
+    } else if (type === 'bulldozer') {
+      this.playAudio('sfx:release_bulldozer', 0.85);
+    } else if (type === 'jadu') {
+      this.playAudio('sfx:release_jadu', 0.85);
+    } else if (type === 'tariff') {
+      this.playAudio('sfx:release_tariff', 0.85);
+    }
   }
 
   startEngine(): void {
-    if (!this.ctx || !this.sfxBus || this.engineOsc) return;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = 55;
-    g.gain.value = 0.08;
-    osc.connect(g).connect(this.sfxBus);
-    osc.start();
-    this.engineOsc = { osc, gain: g };
+    this.playAudio('sfx:engine_loop', 0.6);
   }
 
   setEngine(gain: number, rev: number): void {
     if (!this.engineOsc || !this.ctx) return;
-    this.engineOsc.gain.gain.setTargetAtTime(this.muted ? 0 : gain * 0.15, this.ctx.currentTime, 0.05);
-    this.engineOsc.osc.frequency.setTargetAtTime(48 + rev * 42, this.ctx.currentTime, 0.06);
+    this.engineOsc.gain.gain.setValueAtTime(gain * 0.18, this.ctx.currentTime);
+    this.engineOsc.osc.frequency.setValueAtTime(45 + rev * 90, this.ctx.currentTime);
   }
 
   stopEngine(): void {
@@ -396,15 +452,7 @@ export class SoundEngine {
   }
 
   startDrone(): void {
-    if (!this.ctx || !this.sfxBus || this.droneOsc) return;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 110;
-    g.gain.value = 0.06;
-    osc.connect(g).connect(this.sfxBus);
-    osc.start();
-    this.droneOsc = { osc, gain: g };
+    this.playAudio('sfx:drone', 0.65);
   }
 
   stopDrone(): void {
@@ -415,4 +463,37 @@ export class SoundEngine {
       this.droneOsc = null;
     }
   }
+
+  private playTone(freq: number, dur: number, type: OscillatorType = 'sine', gainVal = 0.25): void {
+    if (!this.ctx || !this.sfxBus || this.muted) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    g.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    osc.connect(g);
+    g.connect(this.sfxBus);
+    osc.start();
+    osc.stop(this.ctx.currentTime + dur);
+  }
+
+  private playNoise(dur: number, filterFreq = 600, gainVal = 0.3): void {
+    if (!this.ctx || !this.noiseBuf || !this.sfxBus || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(filterFreq, this.ctx.currentTime);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(this.sfxBus);
+    src.start();
+    src.stop(this.ctx.currentTime + dur);
+  }
 }
+
+export const sound = new SoundEngine();

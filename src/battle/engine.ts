@@ -8,7 +8,7 @@ import { DT, HARD_BOSS_TUNING, MOVE_CALLOUTS, STAGE_HALF } from '../data/moves.t
 import { Arena } from '../render/arena.ts';
 import { FightCamera } from '../render/camera.ts';
 import { CharacterRig } from '../render/characterRig.ts';
-import { introPose, poseForFighter } from '../render/pose.ts';
+import { getSelectPose, introPose, poseForFighter } from '../render/pose.ts';
 import {
   ChaiwalaWalker,
   CowCrossing,
@@ -69,6 +69,7 @@ export class BattleEngine {
   private elapsed = 0;
   private koSlowMo = 0;
   private idleChatterTimer = 7;
+  private attractTime = 0;
 
   private readonly ai = new CpuAI();
   private readonly aiAttract = new CpuAI();
@@ -402,6 +403,39 @@ export class BattleEngine {
     }
 
     // Main fight simulation loop
+    if (this.opts.attractMode) {
+      this.attractTime += dt;
+      this.p1.x = -1.2;
+      this.p1.y = 0;
+      this.p1.facing = 1;
+      this.p2.x = 1.2;
+      this.p2.y = 0;
+      this.p2.facing = -1;
+
+      const p1Pose = getSelectPose(this.attractTime, this.p1.char.id, true);
+      const p2Pose = getSelectPose(this.attractTime, this.p2.char.id, false);
+
+      this.rig1.blendTo(p1Pose, Math.min(1, dt * 12));
+      this.rig2.blendTo(p2Pose, Math.min(1, dt * 12));
+      this.rig1.setTransform(-1.2, 0, 0, 1);
+      this.rig2.setTransform(1.2, 0, 0, -1);
+      this.rig1.updateBlink(dt);
+      this.rig2.updateBlink(dt);
+
+      this.arena.update(dt, this.elapsed);
+
+      const camT = Math.sin(this.attractTime * 0.25) * 0.12;
+      const dist = 4.1;
+      this.cam.set(
+        new THREE.Vector3(Math.sin(camT) * dist, 1.45, Math.cos(camT) * dist),
+        new THREE.Vector3(0, 1.15, 0),
+        2.5,
+        40
+      );
+      this.cam.update(dt);
+      return;
+    }
+
     if (this.hitStop > 0) {
       this.hitStop--;
       this.cam.update(dt);

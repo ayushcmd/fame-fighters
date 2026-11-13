@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { lerpPose, zeroPose } from './pose.ts';
+import { modelLoader } from './modelLoader.ts';
 import type { ClipRequest, FighterConfig, Pose, RigHandle } from '../types.ts';
 
 function shiftHex(hex: number, hueOffset = 0.22): number {
@@ -14,12 +15,60 @@ function mat(color: number, roughness = 0.72, metalness = 0.04): THREE.MeshStand
   return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
 
+interface BoneJoint {
+  bone: THREE.Bone;
+  rest: THREE.Quaternion;
+  P: THREE.Quaternion;
+  Pinv: THREE.Quaternion;
+}
+
+const DEG82 = THREE.MathUtils.degToRad(82);
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+const A0L = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, -DEG82);
+const A0R = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, DEG82);
+const A0Linv = A0L.clone().invert();
+const A0Rinv = A0R.clone().invert();
+
+const eulerHelper = new THREE.Euler(0, 0, 0, 'XYZ');
+const quatHelper = new THREE.Quaternion();
+const quatEl = new THREE.Quaternion();
+
+function fromEuler(x: number, y: number, z: number, mult = 1): THREE.Quaternion {
+  eulerHelper.set(x * mult, y * mult, z * mult, 'XYZ');
+  return quatHelper.setFromEuler(eulerHelper);
+}
+
+function setJoint(j: BoneJoint | null | undefined, rot: THREE.Quaternion): void {
+  if (!j) return;
+  j.bone.quaternion.copy(j.Pinv).multiply(rot).multiply(j.P).multiply(j.rest);
+}
+
 export class CharacterRig implements RigHandle {
   readonly root = new THREE.Group();
   readonly body = new THREE.Group();
+  private readonly proceduralBody = new THREE.Group();
   current: Pose = zeroPose();
   yaw = Math.PI / 2;
 
+  // GLTF Skinned Model & Mixer
+  private gltfModel: THREE.Group | null = null;
+  private gltfScale = 1.0;
+  private joints: Record<string, BoneJoint | null> = {};
+  private gltfHipsRest = new THREE.Vector3();
+  private mixer: THREE.AnimationMixer | null = null;
+  private danceAction: THREE.AnimationAction | null = null;
+  private clipActions = new Map<string, THREE.AnimationAction>();
+  private activeClip: THREE.AnimationAction | null = null;
+  private gltfHandL: THREE.Object3D | null = null;
+  private gltfHandR: THREE.Object3D | null = null;
+  private gltfHead: THREE.Object3D | null = null;
+  private gltfChest: THREE.Object3D | null = null;
+  private gltfEyeL: THREE.Object3D | null = null;
+  private gltfEyeR: THREE.Object3D | null = null;
+  private isAlt = false;
+
+  // Procedural Limb Hierarchy (Fallback & Synchronous Scaffold)
   private readonly hips = new THREE.Group();
   private readonly spine = new THREE.Group();
   private readonly chest = new THREE.Group();
@@ -54,6 +103,7 @@ export class CharacterRig implements RigHandle {
 
   private blinkTimer = 1.5 + Math.random() * 2.5;
   private blinkDur = 0;
+  private breathTime = Math.random() * 10;
 
   constructor(private readonly cfg: FighterConfig) {
     const { look } = cfg;
@@ -84,9 +134,10 @@ export class CharacterRig implements RigHandle {
     this.contact.position.y = 0.015;
     this.root.add(this.contact);
 
-    // Hips at standard ground leg height 0.97
+    // Procedural hierarchy
+    this.body.add(this.proceduralBody);
     this.hips.position.set(0, 0.97, 0);
-    this.body.add(this.hips);
+    this.proceduralBody.add(this.hips);
 
     const pelvis = new THREE.Mesh(
       new THREE.BoxGeometry(0.32 * look.shoulders, 0.16, 0.22 * look.belly),
@@ -97,288 +148,372 @@ export class CharacterRig implements RigHandle {
     pelvis.castShadow = true;
     this.hips.add(pelvis);
 
-    // Spine + Chest
     this.spine.position.set(0, 0.08, 0);
     this.hips.add(this.spine);
 
     const lowerTorso = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16 * look.belly, 0.15 * look.belly, 0.24, 12),
+      new THREE.BoxGeometry(0.34 * look.shoulders, 0.2, 0.23 * look.belly),
       this.shirtMat
     );
-    lowerTorso.position.y = 0.12;
+    lowerTorso.position.y = 0.1;
     lowerTorso.castShadow = true;
     this.spine.add(lowerTorso);
 
-    this.chest.position.set(0, 0.22, 0);
+    this.chest.position.set(0, 0.2, 0);
     this.spine.add(this.chest);
-    this.chestAnchor.position.set(0, 0.14, 0);
-    this.chest.add(this.chestAnchor);
 
-    const chestMat =
-      look.style === 'kurta-jacket' || look.style === 'suit' || look.style === 'sari'
-        ? this.jacketMat
-        : this.shirtMat;
     const upperTorso = new THREE.Mesh(
-      new THREE.BoxGeometry(0.36 * look.shoulders, 0.28, 0.22 * look.belly),
-      chestMat
+      new THREE.BoxGeometry(0.4 * look.shoulders, 0.26, 0.24 * look.belly),
+      look.jacket !== look.shirt ? this.jacketMat : this.shirtMat
     );
-    upperTorso.position.y = 0.14;
+    upperTorso.position.y = 0.13;
     upperTorso.castShadow = true;
     this.chest.add(upperTorso);
 
-    if (look.style === 'suit') {
-      const tie = new THREE.Mesh(
-        new THREE.BoxGeometry(0.055, 0.26, 0.03),
-        mat(0xe0262f, 0.45)
-      );
-      tie.position.set(0, 0.11, 0.115 * look.belly);
-      this.chest.add(tie);
-    } else if (look.style === 'kurta-jacket') {
-      const kurtaFront = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 0.27, 0.225 * look.belly),
-        this.shirtMat
-      );
-      kurtaFront.position.set(0, 0.14, 0.005);
-      this.chest.add(kurtaFront);
-    } else if (look.style === 'sari') {
-      const pallu = new THREE.Mesh(
-        new THREE.BoxGeometry(0.14, 0.34, 0.23 * look.belly),
-        this.jacketMat
-      );
-      pallu.position.set(-0.07, 0.13, 0.01);
-      pallu.rotation.z = 0.35;
-      this.chest.add(pallu);
-    } else if (look.style === 'dhoti') {
-      // Sacred shawl over shoulder for Mbapu
-      const shawl = new THREE.Mesh(
-        new THREE.TorusGeometry(0.19 * look.shoulders, 0.04, 8, 18),
-        this.shirtMat
-      );
-      shawl.rotation.set(Math.PI / 2 - 0.3, 0.2, 0);
-      shawl.position.set(0, 0.22, 0);
-      this.chest.add(shawl);
-    }
+    this.chestAnchor.position.set(0, 0.15, 0);
+    this.chest.add(this.chestAnchor);
 
-    // Head
-    this.head.position.set(0, 0.31, 0);
+    this.head.position.set(0, 0.3, 0);
     this.chest.add(this.head);
 
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.062, 0.1, 10), skinMat);
-    neck.position.y = 0.03;
-    this.head.add(neck);
+    const headGeo = new THREE.BoxGeometry(0.24, 0.26, 0.24);
+    const headMesh = new THREE.Mesh(headGeo, skinMat);
+    headMesh.position.y = 0.13;
+    headMesh.castShadow = true;
+    this.head.add(headMesh);
 
-    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.145, 18, 16), skinMat);
-    skull.scale.set(0.95, 1.08, 1.02);
-    skull.position.y = 0.16;
-    skull.castShadow = true;
-    this.head.add(skull);
-    this.headAnchor.position.set(0, 0.18, 0);
+    this.headAnchor.position.set(0, 0.15, 0);
     this.head.add(this.headAnchor);
 
-    // Ears
-    for (const s of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), skinMat);
-      ear.scale.set(0.55, 1.1, 0.7);
-      ear.position.set(s * 0.14, 0.15, 0);
-      this.head.add(ear);
+    const eyeL = new THREE.Object3D();
+    const eyeR = new THREE.Object3D();
+    eyeL.position.set(0.06, 0.15, 0.13);
+    eyeR.position.set(-0.06, 0.15, 0.13);
+    this.head.add(eyeL);
+    this.head.add(eyeR);
+    this.eyeAnchors = { l: eyeL, r: eyeR };
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const eyeGeo = new THREE.BoxGeometry(0.028, 0.028, 0.01);
+    const mEyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    const mEyeR = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.add(mEyeL);
+    eyeR.add(mEyeR);
+
+    const lidMat = new THREE.MeshBasicMaterial({ color: look.skin });
+    const lidGeo = new THREE.BoxGeometry(0.03, 0.03, 0.012);
+    const lidL = new THREE.Mesh(lidGeo, lidMat);
+    const lidR = new THREE.Mesh(lidGeo, lidMat);
+    lidL.scale.y = 0.05;
+    lidR.scale.y = 0.05;
+    eyeL.add(lidL);
+    eyeR.add(lidR);
+    this.eyelids.push(lidL, lidR);
+
+    if (look.hair !== look.skin) {
+      const hair = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.26), hairMat);
+      hair.position.set(0, 0.25, 0);
+      this.head.add(hair);
     }
 
-    // Nose
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 8), skinMat);
-    nose.rotation.x = Math.PI / 2;
-    nose.position.set(0, 0.15, 0.15);
-    this.head.add(nose);
-
-    // Eyes + Eyelids
-    const eyeWhite = mat(0xffffff, 0.2);
-    const pupilMat = mat(0x161210, 0.2);
-    const lEye = new THREE.Object3D();
-    const rEye = new THREE.Object3D();
-    lEye.position.set(-0.048, 0.18, 0.13);
-    rEye.position.set(0.048, 0.18, 0.13);
-    this.head.add(lEye, rEye);
-    this.eyeAnchors = { l: lEye, r: rEye };
-
-    for (const s of [-1, 1]) {
-      const ew = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 10), eyeWhite);
-      ew.scale.set(1, 0.85, 0.65);
-      ew.position.set(s * 0.048, 0.18, 0.125);
-      const pup = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), pupilMat);
-      pup.position.set(s * 0.048, 0.18, 0.139);
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.044, 0.02), skinMat);
-      lid.position.set(s * 0.048, 0.18, 0.135);
-      lid.scale.y = 0.05;
-      this.eyelids.push(lid);
-      this.head.add(ew, pup, lid);
-    }
-
-    // Hair
-    if (look.hairStyle === 'pompadour') {
-      const pomp = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.11, 0.26), hairMat);
-      pomp.position.set(0, 0.28, 0.03);
-      pomp.rotation.x = -0.18;
-      this.head.add(pomp);
-    } else if (look.hairStyle === 'short' || look.hairStyle === 'side-part') {
-      const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
-        hairMat
-      );
-      cap.position.y = 0.165;
-      cap.rotation.x = -0.15;
-      this.head.add(cap);
-    } else if (look.hairStyle === 'bun') {
-      const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.148, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
-        hairMat
-      );
-      cap.position.y = 0.165;
-      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), hairMat);
-      bun.position.set(0, 0.22, -0.14);
-      this.head.add(cap, bun);
-    } else if (look.hairStyle === 'receding') {
-      const back = new THREE.Mesh(
-        new THREE.SphereGeometry(0.148, 14, 10, 0, Math.PI * 2, 0.35, Math.PI * 0.42),
-        hairMat
-      );
-      back.position.set(0, 0.165, -0.02);
-      back.rotation.x = -0.45;
-      this.head.add(back);
-    }
-
-    // Beard
-    if (look.beardStyle === 'full') {
-      const beard = new THREE.Mesh(new THREE.SphereGeometry(0.135, 14, 12), beardMat);
-      beard.scale.set(0.95, 0.9, 0.85);
-      beard.position.set(0, 0.08, 0.03);
+    if (look.beard !== look.skin) {
+      const beard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.14), beardMat);
+      beard.position.set(0, 0.05, 0.1);
       this.head.add(beard);
-    } else if (look.beardStyle === 'trim') {
-      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.07, 0.16), beardMat);
-      jaw.position.set(0, 0.075, 0.04);
-      this.head.add(jaw);
     }
 
-    if (cfg.id === 'modi' || cfg.id === 'mbapu') {
-      const stache = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.025, 0.03), beardMat);
-      stache.position.set(0, 0.115, 0.142);
-      this.head.add(stache);
+    if (look.glasses) {
+      const frameMat = mat(0x1a1a1a, 0.3, 0.8);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.02), frameMat);
+      glass.position.set(0, 0.15, 0.135);
+      this.head.add(glass);
     }
 
-    // Glasses
-    if (look.glasses !== 'none') {
-      const gMat = mat(look.glasses === 'round' ? 0x221b18 : 0xd4d4d8, 0.3, 0.7);
-      for (const s of [-1, 1]) {
-        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.005, 6, 18), gMat);
-        rim.position.set(s * 0.048, 0.18, 0.145);
-        this.head.add(rim);
+    // Left arm
+    this.lSh.position.set(0.24 * look.shoulders, 0.22, 0);
+    this.chest.add(this.lSh);
+    const lUpper = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.26, 0.1), this.shirtMat);
+    lUpper.position.y = -0.13;
+    lUpper.castShadow = true;
+    this.lSh.add(lUpper);
+
+    this.lEl.position.set(0, -0.26, 0);
+    this.lSh.add(this.lEl);
+    const lFore = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.24, 0.09), skinMat);
+    lFore.position.y = -0.12;
+    lFore.castShadow = true;
+    this.lEl.add(lFore);
+
+    this.lHandAnchor.position.set(0, -0.24, 0);
+    this.lEl.add(this.lHandAnchor);
+    const lHandMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+    lHandMesh.position.y = -0.04;
+    this.lHandAnchor.add(lHandMesh);
+
+    // Right arm
+    this.rSh.position.set(-0.24 * look.shoulders, 0.22, 0);
+    this.chest.add(this.rSh);
+    const rUpper = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.26, 0.1), this.shirtMat);
+    rUpper.position.y = -0.13;
+    rUpper.castShadow = true;
+    this.rSh.add(rUpper);
+
+    this.rEl.position.set(0, -0.26, 0);
+    this.rSh.add(this.rEl);
+    const rFore = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.24, 0.09), skinMat);
+    rFore.position.y = -0.12;
+    rFore.castShadow = true;
+    this.rEl.add(rFore);
+
+    this.rHandAnchor.position.set(0, -0.24, 0);
+    this.rEl.add(this.rHandAnchor);
+    const rHandMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), skinMat);
+    rHandMesh.position.y = -0.04;
+    this.rHandAnchor.add(rHandMesh);
+
+    // Legs
+    this.lTh.position.set(0.12, 0, 0);
+    this.hips.add(this.lTh);
+    const lThigh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.44, 0.13), pantsMat);
+    lThigh.position.y = -0.22;
+    lThigh.castShadow = true;
+    this.lTh.add(lThigh);
+
+    this.lKn.position.set(0, -0.44, 0);
+    this.lTh.add(this.lKn);
+    const lShin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.12), pantsMat);
+    lShin.position.y = -0.21;
+    lShin.castShadow = true;
+    this.lKn.add(lShin);
+
+    this.lAnk.position.set(0, -0.42, 0);
+    this.lKn.add(this.lAnk);
+    const lShoe = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.2), shoeMat);
+    lShoe.position.set(0, -0.045, 0.04);
+    lShoe.castShadow = true;
+    this.lAnk.add(lShoe);
+
+    this.rTh.position.set(-0.12, 0, 0);
+    this.hips.add(this.rTh);
+    const rThigh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.44, 0.13), pantsMat);
+    rThigh.position.y = -0.22;
+    rThigh.castShadow = true;
+    this.rTh.add(rThigh);
+
+    this.rKn.position.set(0, -0.44, 0);
+    this.rTh.add(this.rKn);
+    const rShin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.12), pantsMat);
+    rShin.position.y = -0.21;
+    rShin.castShadow = true;
+    this.rKn.add(rShin);
+
+    this.rAnk.position.set(0, -0.42, 0);
+    this.rKn.add(this.rAnk);
+    const rShoe = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.2), shoeMat);
+    rShoe.position.set(0, -0.045, 0.04);
+    rShoe.castShadow = true;
+    this.rAnk.add(rShoe);
+
+    // Initiate GLTF Skinned Model loading
+    this.initGLTF();
+  }
+
+  private async initGLTF(): Promise<void> {
+    try {
+      await modelLoader.load(this.cfg.id);
+      const cloned = modelLoader.clone(this.cfg.id, this.isAlt);
+      if (!cloned) return;
+
+      this.gltfModel = cloned.model;
+      this.gltfScale = cloned.scale;
+
+      // Bind skeleton bones
+      const bind = (name: string): BoneJoint | null => {
+        let bone: THREE.Bone | null = null;
+        const reg = new RegExp(`^${name}(_\\d+)?$`);
+        this.gltfModel!.traverse((o) => {
+          if (!bone && (o as THREE.Bone).isBone && reg.test(o.name)) {
+            bone = o as THREE.Bone;
+          }
+        });
+        if (!bone || !(bone as THREE.Bone).parent) return null;
+        const b = bone as THREE.Bone;
+        const p = b.parent!;
+        const P = new THREE.Quaternion();
+        p.getWorldQuaternion(P);
+        return {
+          bone: b,
+          rest: b.quaternion.clone(),
+          P,
+          Pinv: P.clone().invert(),
+        };
+      };
+
+      const boneNames = [
+        'Hips',
+        'Spine',
+        'Spine1',
+        'Spine2',
+        'Neck',
+        'Head',
+        'LeftArm',
+        'LeftForeArm',
+        'RightArm',
+        'RightForeArm',
+        'LeftUpLeg',
+        'LeftLeg',
+        'LeftFoot',
+        'RightUpLeg',
+        'RightLeg',
+        'RightFoot',
+      ];
+      for (const name of boneNames) {
+        this.joints[name] = bind(name);
       }
-      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.006, 0.006), gMat);
-      bridge.position.set(0, 0.18, 0.146);
-      this.head.add(bridge);
+
+      if (this.joints.Hips) {
+        this.gltfHipsRest.copy(this.joints.Hips.bone.position);
+      }
+
+      // Head scaling
+      if (this.joints.Head) {
+        const headScale = (this.cfg as { headScale?: number }).headScale ?? 1.32;
+        this.joints.Head.bone.scale.multiplyScalar(headScale);
+      }
+
+      // Hand and Eye anchors
+      const findObj = (name: string): THREE.Object3D | null => {
+        let found: THREE.Object3D | null = null;
+        const reg = new RegExp(`^${name}(_\\d+)?$`);
+        this.gltfModel!.traverse((o) => {
+          if (!found && reg.test(o.name)) found = o;
+        });
+        return found;
+      };
+
+      this.gltfHandL = findObj('LeftHandMiddle1') ?? findObj('LeftHand');
+      this.gltfHandR = findObj('RightHandMiddle1') ?? findObj('RightHand');
+      this.gltfHead = this.joints.Head?.bone ?? null;
+      this.gltfChest = this.joints.Spine2?.bone ?? null;
+      this.gltfEyeL = findObj('LeftEye');
+      this.gltfEyeR = findObj('RightEye');
+
+      // Scale model
+      const totalScale = this.gltfScale * (this.cfg.modelHeight ?? 1.0);
+      this.gltfModel.scale.setScalar(totalScale);
+
+      // AnimationMixer & Clips
+      this.mixer = new THREE.AnimationMixer(this.gltfModel);
+      if (cloned.dance) {
+        this.danceAction = this.mixer.clipAction(cloned.dance);
+      }
+      for (const clip of cloned.clips) {
+        this.clipActions.set(clip.name, this.mixer.clipAction(clip));
+      }
+
+      // Hide procedural body and show GLTF
+      this.proceduralBody.visible = false;
+      this.body.add(this.gltfModel);
+      this.applyPose(this.current);
+    } catch (err) {
+      console.warn(`[CharacterRig] GLTF initialization error for ${this.cfg.id}:`, err);
     }
-
-    // Tilak for Yogi
-    if (cfg.id === 'yogi') {
-      const tilak = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.055, 0.01), mat(0xdc2626));
-      tilak.position.set(0, 0.24, 0.135);
-      this.head.add(tilak);
-    }
-
-    // Arms helper
-    const armMat = look.style === 'suit' ? this.jacketMat : look.style === 'tshirt' ? skinMat : this.shirtMat;
-    const upperArmMat = look.style === 'tshirt' ? this.shirtMat : armMat;
-    const buildArm = (side: -1 | 1, shG: THREE.Group, elG: THREE.Group, handAnchor: THREE.Object3D) => {
-      shG.position.set(side * (0.21 * look.shoulders), 0.25, 0);
-      this.chest.add(shG);
-
-      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.045, 0.27, 10), upperArmMat);
-      upper.position.y = -0.135;
-      upper.castShadow = true;
-      shG.add(upper);
-
-      elG.position.set(0, -0.27, 0);
-      shG.add(elG);
-
-      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.036, 0.25, 10), armMat);
-      fore.position.y = -0.125;
-      fore.castShadow = true;
-      elG.add(fore);
-
-      const fist = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.08, 0.08), skinMat);
-      fist.position.y = -0.27;
-      fist.castShadow = true;
-      elG.add(fist);
-
-      handAnchor.position.set(0, -0.29, 0);
-      elG.add(handAnchor);
-    };
-
-    buildArm(-1, this.lSh, this.lEl, this.lHandAnchor);
-    buildArm(1, this.rSh, this.rEl, this.rHandAnchor);
-
-    // Legs helper
-    const buildLeg = (side: -1 | 1, thG: THREE.Group, knG: THREE.Group, ankG: THREE.Group) => {
-      thG.position.set(side * 0.1, -0.05, 0);
-      this.hips.add(thG);
-
-      const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.058, 0.48, 10), pantsMat);
-      thigh.position.y = -0.24;
-      thigh.castShadow = true;
-      thG.add(thigh);
-
-      knG.position.set(0, -0.49, 0);
-      thG.add(knG);
-
-      const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.054, 0.042, 0.44, 10), pantsMat);
-      shin.position.y = -0.22;
-      shin.castShadow = true;
-      knG.add(shin);
-
-      ankG.position.set(0, -0.44, 0);
-      knG.add(ankG);
-
-      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.065, 0.21), shoeMat);
-      shoe.position.set(0, -0.01, 0.045);
-      shoe.castShadow = true;
-      ankG.add(shoe);
-    };
-
-    buildLeg(-1, this.lTh, this.lKn, this.lAnk);
-    buildLeg(1, this.rTh, this.rKn, this.rAnk);
   }
 
   setAltTint(alt: boolean): void {
-    this.jacketMat.color.setHex(alt ? shiftHex(this.baseJacketHex, 0.35) : this.baseJacketHex);
-    this.shirtMat.color.setHex(alt ? shiftHex(this.baseShirtHex, 0.15) : this.baseShirtHex);
+    this.isAlt = alt;
+    if (alt) {
+      this.jacketMat.color.setHex(shiftHex(this.baseJacketHex, 0.35));
+      this.shirtMat.color.setHex(shiftHex(this.baseShirtHex, 0.35));
+    } else {
+      this.jacketMat.color.setHex(this.baseJacketHex);
+      this.shirtMat.color.setHex(this.baseShirtHex);
+    }
+  }
+
+  setFacePhoto(): void {
+    // Authentic GLTF models have genuine faces baked into materials/textures.
   }
 
   applyPose(p: Pose): void {
-    this.current = { ...p };
-    this.hips.position.set(0, 0.97 + p.rootY, p.rootZ);
-    this.hips.rotation.set(-p.hipsF, p.hipsT, p.hipsS);
+    this.current = p;
+
+    // 1. Update GLTF Skeleton if ready
+    if (this.gltfModel && this.joints.Hips) {
+      const j = this.joints;
+      const s = this.gltfScale;
+      const breath = Math.sin(this.breathTime * 2.1) * 0.018;
+
+      if (j.Hips) {
+        j.Hips.bone.position.set(
+          this.gltfHipsRest.x,
+          this.gltfHipsRest.y + p.rootY / s,
+          this.gltfHipsRest.z + p.rootZ / s
+        );
+        setJoint(j.Hips, fromEuler(p.hipsF, p.hipsT, p.hipsS));
+      }
+      setJoint(j.Spine, fromEuler(p.spineF, p.spineT, p.spineS, 0.5));
+      setJoint(j.Spine1, fromEuler(p.spineF, p.spineT, p.spineS, 0.5));
+      setJoint(j.Spine2, fromEuler(p.chestF - breath, 0, 0));
+      setJoint(j.Neck, fromEuler(p.headF, p.headT, p.headS, 0.4));
+      setJoint(j.Head, fromEuler(p.headF + breath * 0.5, p.headT, p.headS, 0.6));
+
+      // Left Arm
+      const qLeft = fromEuler(-p.lShF, p.lShT, p.lShO).multiply(A0L);
+      setJoint(j.LeftArm, qLeft);
+      quatEl.setFromAxisAngle(X_AXIS, -p.lEl);
+      const qLeftFore = A0Linv.clone().multiply(quatEl).multiply(A0L);
+      setJoint(j.LeftForeArm, qLeftFore);
+
+      // Right Arm
+      const qRight = fromEuler(-p.rShF, -p.rShT, -p.rShO).multiply(A0R);
+      setJoint(j.RightArm, qRight);
+      quatEl.setFromAxisAngle(X_AXIS, -p.rEl);
+      const qRightFore = A0Rinv.clone().multiply(quatEl).multiply(A0R);
+      setJoint(j.RightForeArm, qRightFore);
+
+      // Left Leg
+      setJoint(j.LeftUpLeg, fromEuler(-p.lThF, 0, p.lThO));
+      setJoint(j.LeftLeg, quatHelper.setFromAxisAngle(X_AXIS, p.lKn));
+      setJoint(j.LeftFoot, quatHelper.setFromAxisAngle(X_AXIS, p.lAnk));
+
+      // Right Leg
+      setJoint(j.RightUpLeg, fromEuler(-p.rThF, 0, -p.rThO));
+      setJoint(j.RightLeg, quatHelper.setFromAxisAngle(X_AXIS, p.rKn));
+      setJoint(j.RightFoot, quatHelper.setFromAxisAngle(X_AXIS, p.rAnk));
+    }
+
+    // 2. Procedural Hierarchy Updates
+    this.hips.position.y = 0.97 + p.rootY;
+    this.hips.position.z = p.rootZ;
+    this.hips.rotation.set(p.hipsF, p.hipsT, p.hipsS);
+
     this.spine.rotation.set(p.spineF, p.spineT, p.spineS);
     this.chest.rotation.set(p.chestF, 0, 0);
     this.head.rotation.set(p.headF, p.headT, p.headS);
 
-    this.lSh.rotation.set(-p.lShF, p.lShT, -p.lShO);
+    this.lSh.rotation.set(-p.lShF, p.lShT, p.lShO);
     this.lEl.rotation.set(-p.lEl, 0, 0);
-    this.rSh.rotation.set(-p.rShF, -p.rShT, p.rShO);
+
+    this.rSh.rotation.set(-p.rShF, -p.rShT, -p.rShO);
     this.rEl.rotation.set(-p.rEl, 0, 0);
 
-    this.lTh.rotation.set(-p.lThF, 0, -p.lThO);
+    this.lTh.rotation.set(-p.lThF, 0, p.lThO);
     this.lKn.rotation.set(p.lKn, 0, 0);
     this.lAnk.rotation.set(p.lAnk, 0, 0);
 
-    this.rTh.rotation.set(-p.rThF, 0, p.rThO);
+    this.rTh.rotation.set(-p.rThF, 0, -p.rThO);
     this.rKn.rotation.set(p.rKn, 0, 0);
     this.rAnk.rotation.set(p.rAnk, 0, 0);
   }
 
-  blendTo(p: Pose, alpha: number): void {
-    this.applyPose(lerpPose(this.current, p, alpha));
+  blendTo(pose: Pose, alpha: number): void {
+    const a = Math.max(0, Math.min(1, alpha));
+    this.applyPose(lerpPose(this.current, pose, a));
   }
 
-  snapTo(p: Pose): void {
-    this.applyPose(p);
+  snapTo(pose: Pose): void {
+    this.applyPose(pose);
   }
 
   setTransform(x: number, y: number, z: number, facing: number): void {
@@ -397,6 +532,7 @@ export class CharacterRig implements RigHandle {
   }
 
   updateBlink(dt: number): void {
+    this.breathTime += dt;
     this.blinkTimer -= dt;
     if (this.blinkTimer <= 0) {
       this.blinkDur = 0.12;
@@ -415,25 +551,50 @@ export class CharacterRig implements RigHandle {
 
   handWorld(side: 'l' | 'r', out: THREE.Vector3): THREE.Vector3 {
     this.root.updateMatrixWorld(true);
+    if (this.gltfModel) {
+      const anchor = side === 'l' ? this.gltfHandL : this.gltfHandR;
+      if (anchor) return anchor.getWorldPosition(out);
+    }
     return (side === 'l' ? this.lHandAnchor : this.rHandAnchor).getWorldPosition(out);
   }
 
   headWorld(out: THREE.Vector3): THREE.Vector3 {
     this.root.updateMatrixWorld(true);
+    if (this.gltfModel && this.gltfHead) {
+      return this.gltfHead.getWorldPosition(out);
+    }
     return this.headAnchor.getWorldPosition(out);
   }
 
   eyeWorld(side: 'l' | 'r', out: THREE.Vector3): THREE.Vector3 | null {
     this.root.updateMatrixWorld(true);
+    if (this.gltfModel) {
+      const eye = side === 'l' ? this.gltfEyeL : this.gltfEyeR;
+      if (eye) return eye.getWorldPosition(out);
+    }
     return (side === 'l' ? this.eyeAnchors.l : this.eyeAnchors.r).getWorldPosition(out);
   }
 
   chestWorld(out: THREE.Vector3): THREE.Vector3 {
     this.root.updateMatrixWorld(true);
+    if (this.gltfModel && this.gltfChest) {
+      return this.gltfChest.getWorldPosition(out);
+    }
     return this.chestAnchor.getWorldPosition(out);
   }
 
   playClip(clip: ClipRequest, dt: number): boolean {
+    const action = this.clipActions.get(clip.name);
+    if (action && this.mixer) {
+      if (this.activeClip !== action) {
+        this.activeClip?.fadeOut(0.12);
+        action.reset().fadeIn(0.12).play();
+        this.activeClip = action;
+      }
+      this.mixer.update(dt);
+      return true;
+    }
+
     const t = clip.time;
     const p = zeroPose();
     if (clip.name === 'cross' || clip.name === 'upper') {
@@ -453,13 +614,27 @@ export class CharacterRig implements RigHandle {
     return true;
   }
 
-  stopClip(): void {}
+  stopClip(): void {
+    if (this.activeClip) {
+      this.activeClip.fadeOut(0.14);
+      this.activeClip = null;
+    }
+  }
 
-  playDance(): boolean {
+  playDance(dt: number): boolean {
+    if (this.danceAction && this.mixer) {
+      if (!this.danceAction.isRunning()) {
+        this.danceAction.reset().play();
+      }
+      this.mixer.update(dt);
+      return true;
+    }
     return false;
   }
 
-  stopDance(): void {}
+  stopDance(): void {
+    this.danceAction?.stop();
+  }
 
   setMirror(mirror: boolean): void {
     this.body.scale.x = Math.abs(this.body.scale.x) * (mirror ? -1 : 1);
@@ -467,6 +642,7 @@ export class CharacterRig implements RigHandle {
 
   dispose(): void {
     this.root.removeFromParent();
+    this.mixer?.stopAllAction();
     this.root.traverse((obj) => {
       const m = obj as THREE.Mesh;
       m.geometry?.dispose?.();

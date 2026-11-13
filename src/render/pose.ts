@@ -687,3 +687,57 @@ export function poseForFighter(
       return idlePose(t, id);
   }
 }
+
+export function getSelectPose(time: number, id: FighterId, isP1: boolean): Pose {
+  const p = zeroPose();
+  if (isP1) {
+    if (id === 'modi') {
+      const sw = Math.sin(time * 2) * 0.08;
+      p.headT = 0.6;
+      p.headF = -0.1;
+      p.spineF = -0.05;
+      p.lShF = 0.5 + sw;
+      p.lShO = 1.0;
+      p.lShT = 0.6;
+      p.lEl = 0.5;
+      p.lHand = 1;
+      p.rShF = 0.5 - sw;
+      p.rShO = 1.0;
+      p.rShT = 0.6;
+      p.rEl = 0.5;
+      p.rHand = 1;
+      return p;
+    }
+    p.lShF = 0.6;
+    p.lShO = 0.35;
+    p.lEl = 0.8;
+    p.rShF = 0.6;
+    p.rShO = 0.35;
+    p.rEl = 0.8;
+    p.headT = 0.4;
+    return p;
+  } else {
+    if (id === 'rahul') {
+      const sway = Math.sin(time * 1.3);
+      p.spineS = sway * 0.22;
+      p.chestF = -0.03;
+      p.headS = sway * 0.15;
+      p.headF = -0.1;
+      p.headT = 0.35;
+      p.lShF = 2.85;
+      p.lShO = 0.15 - sway * 0.15;
+      p.lEl = 0.35;
+      p.rShF = 2.85;
+      p.rShO = 0.15 + sway * 0.15;
+      p.rEl = 0.35;
+      return p;
+    }
+    p.lShF = 2.6;
+    p.lEl = 0.3;
+    p.rShF = 2.6;
+    p.rEl = 0.3;
+    p.headT = 0.3;
+    return p;
+  }
+}
+

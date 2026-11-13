@@ -123,6 +123,7 @@ export interface FighterConfig {
   superDesc: string;
   introLine: string;
   winLine: string;
+  facePhoto?: string;
   dance: DanceInfo;
   bossOnly?: boolean;
 }

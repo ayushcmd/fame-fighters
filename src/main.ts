@@ -49,6 +49,7 @@ class SansadShowdownApp {
   private pickTurn: 'p1' | 'p2' = 'p1';
   private winsCount = 0;
   private lossCount = 0;
+  private screenEnteredTime = performance.now();
 
   private lastFrameTime = performance.now();
 
@@ -86,6 +87,7 @@ class SansadShowdownApp {
       console.error('WebGL initialization failed:', err);
     }
 
+    document.documentElement.classList.add('diwali');
     window.addEventListener('resize', () => this.onResize());
 
     populateAllPortraits();
@@ -111,6 +113,7 @@ class SansadShowdownApp {
 
   private showScreen(name: ScreenName): void {
     this.currentScreen = name;
+    this.screenEnteredTime = performance.now();
     document.getElementById('loading')?.classList.toggle('hidden', name !== 'loading');
     document.getElementById('title')?.classList.toggle('hidden', name !== 'title');
     document.getElementById('select')?.classList.toggle('hidden', name !== 'select');
@@ -215,6 +218,7 @@ class SansadShowdownApp {
       this.audio.setTrack('background');
       this.showScreen('select');
       this.syncSelectUI();
+      this.startAttractScene();
     };
     titleEl?.addEventListener('click', enterSelect);
     window.addEventListener('keydown', (e) => {
@@ -319,7 +323,7 @@ class SansadShowdownApp {
 
     // Select screen keyboard navigation
     window.addEventListener('keydown', (e) => {
-      if (this.currentScreen !== 'select') return;
+      if (this.currentScreen !== 'select' || performance.now() - this.screenEnteredTime < 350) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         const idx = ROSTER_ORDER.indexOf(this.p1Pick);
         const dir = e.key === 'ArrowRight' ? 1 : -1;
@@ -403,10 +407,7 @@ class SansadShowdownApp {
 
     const prompt = document.getElementById('pick-prompt');
     if (prompt) {
-      prompt.textContent =
-        this.pickTurn === 'p1'
-          ? 'PICKING 1P · CLICK A NETA OR HIT FIGHT!'
-          : 'PICKING CPU · CLICK A NETA OR HIT FIGHT!';
+      prompt.textContent = 'PICK YOUR NETA';
     }
 
     const onlineStatus = document.getElementById('online-status');

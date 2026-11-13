@@ -8,8 +8,14 @@ function hexCss(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
 }
 
-/** Generate a stylized satirical vector-look portrait data URL for a fighter. */
 export function getFighterPortraitUrl(id: FighterId): string {
+  const cfg = FIGHTERS[id];
+  if (cfg?.facePhoto) return cfg.facePhoto;
+  return `/faces/${id}.webp`;
+}
+
+/** Fallback generator for stylized satirical vector portrait. */
+export function generateProceduralPortrait(id: FighterId): string {
   if (portraitCache.has(id)) return portraitCache.get(id)!;
 
   const cfg = FIGHTERS[id];
