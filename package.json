@@ -1,0 +1,23 @@
+{
+  "name": "fame-fighters",
+  "version": "1.0.0",
+  "description": "3D satirical arcade fighter built with Three.js and TypeScript",
+  "author": "ayushcmd <ayush_24a12res897@iitp.ac.in>",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.174.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.174.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0"
+  }
+}
