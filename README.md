@@ -110,7 +110,7 @@ Visit `http://localhost:5173` in your browser.
 ## 📁 Project Architecture
 
 ```
-sansad-showdown/
+fame-fighters/
 ├── index.html               # Main app shell & modal screens
 ├── package.json             # NPM scripts & dependencies (three, vite, typescript)
 ├── tsconfig.json            # Strict TypeScript configuration
