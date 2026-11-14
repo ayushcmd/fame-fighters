@@ -109,6 +109,8 @@ Visit `http://localhost:5173` in your browser.
 
 ## 📁 Project Architecture
 
+The tree below uses the directory name created when cloning this repository.
+
 ```
 fame-fighters/
 ├── index.html               # Main app shell & modal screens
