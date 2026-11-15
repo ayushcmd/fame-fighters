@@ -63,6 +63,13 @@ export class FighterState {
   comboHits = 0;
   comboTimer = 0;
 
+  private inputBuffer: {
+    kind: 'punch' | 'kick' | 'grab';
+    frames: number;
+    relX: number;
+    crouch: boolean;
+  } | null = null;
+
   private prevPunch = false;
   private prevKick = false;
   private prevGrab = false;
@@ -111,6 +118,7 @@ export class FighterState {
     this.airAttackUsed = false;
     this.comboHits = 0;
     this.comboTimer = 0;
+    this.inputBuffer = null;
     this.prevPunch = false;
     this.prevKick = false;
     this.prevGrab = false;
@@ -213,6 +221,21 @@ export class FighterState {
     this.onAttackStart?.(def);
   }
 
+  private executeAttackFromInput(kind: 'punch' | 'kick' | 'grab', relX: number, isCrouching: boolean): void {
+    if (kind === 'grab') {
+      this.crouching = false;
+      this.startAttack('grab');
+    } else if (kind === 'punch') {
+      if (isCrouching) this.startAttack('lowJab');
+      else if (relX > 0) this.startAttack('special1');
+      else this.startAttack('jab');
+    } else if (kind === 'kick') {
+      if (isCrouching) this.startAttack('sweep');
+      else if (relX > 0) this.startAttack('special2');
+      else this.startAttack('kick');
+    }
+  }
+
   update(input: InputState, opponentX: number, dt = 1 / 60): void {
     this.stateFrames++;
     if (this.invulFrames > 0) this.invulFrames--;
@@ -228,6 +251,11 @@ export class FighterState {
     if (this.comboTimer > 0) {
       this.comboTimer--;
       if (this.comboTimer <= 0) this.comboHits = 0;
+    }
+
+    if (this.inputBuffer) {
+      this.inputBuffer.frames--;
+      if (this.inputBuffer.frames <= 0) this.inputBuffer = null;
     }
 
     if (this.bossRegen > 0 && this.hp > 0 && this.hp < this.maxHp) {
@@ -314,6 +342,13 @@ export class FighterState {
         else if (kickEdge && def.chains.kick) this.attack.chained = def.chains.kick;
       }
 
+      // Buffer upcoming attack during recovery frames
+      if (frame > def.startup + def.active) {
+        if (grabEdge) this.inputBuffer = { kind: 'grab', frames: 10, relX, crouch: input.down };
+        else if (punchEdge) this.inputBuffer = { kind: 'punch', frames: 10, relX, crouch: input.down };
+        else if (kickEdge) this.inputBuffer = { kind: 'kick', frames: 10, relX, crouch: input.down };
+      }
+
       if (this.attack.chained && frame >= def.startup + def.active) {
         const nextId = this.attack.chained;
         this.startAttack(nextId);
@@ -324,6 +359,12 @@ export class FighterState {
       if (frame >= total) {
         this.attack = null;
         this.forceState(input.down ? 'crouch' : 'idle');
+        if (this.inputBuffer && this.inputBuffer.frames > 0) {
+          const buf = this.inputBuffer;
+          this.inputBuffer = null;
+          this.executeAttackFromInput(buf.kind, buf.relX, buf.crouch);
+          return;
+        }
       }
       return;
     }
@@ -352,22 +393,17 @@ export class FighterState {
     this.crouching = input.down;
 
     if (grabEdge || (input.punch && input.kick && punchEdge)) {
-      this.crouching = false;
-      this.startAttack('grab');
+      this.executeAttackFromInput('grab', relX, false);
       return;
     }
 
     if (punchEdge) {
-      if (this.crouching) this.startAttack('lowJab');
-      else if (relX > 0) this.startAttack('special1');
-      else this.startAttack('jab');
+      this.executeAttackFromInput('punch', relX, this.crouching);
       return;
     }
 
     if (kickEdge) {
-      if (this.crouching) this.startAttack('sweep');
-      else if (relX > 0) this.startAttack('special2');
-      else this.startAttack('kick');
+      this.executeAttackFromInput('kick', relX, this.crouching);
       return;
     }
 

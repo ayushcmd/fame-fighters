@@ -744,6 +744,7 @@ export class NirmalaBudgetSequence extends BaseSuper {
     this.nirmalaCard.position.y = -1.5 + 2.38 * rise;
     if (this.once('arrive', 0.1)) {
       audio.whoosh();
+      audio.playVoice('nirmala');
       flash('rgba(255,210,120,0.45)', 160);
       speech(caster, 'NIRMALA BUDGET SPECIAL!');
     }

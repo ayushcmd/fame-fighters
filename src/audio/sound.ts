@@ -63,6 +63,7 @@ const AUDIO_ASSETS: Record<string, string> = {
   'sfx:news_sting': '/assets/news_sting-C-mndS4t.mp3',
   'sfx:poof': '/assets/poof-BlJFjDeg.mp3',
   'sfx:charge_chakra': '/assets/charge_chakra-1s5EOYKm.mp3',
+  'sfx:bed_chakra': '/assets/bed_chakra-CjyFjT3l.mp3',
   'sfx:release_chakra': '/assets/release_chakra-BvOYn27E.mp3',
   'sfx:release_bulldozer': '/assets/release_bulldozer-CyubjB_l.mp3',
   'sfx:bed_bulldozer': '/assets/bed_bulldozer-BE_e8yDo.mp3',
@@ -73,6 +74,8 @@ const AUDIO_ASSETS: Record<string, string> = {
   'sfx:aloolelo': '/assets/aloolelo-BopBNjJr.mp3',
   'sfx:cow_bell': '/assets/cow_bell-Cj3rAWh8.mp3',
   'sfx:horn_long': '/assets/horn_long-dLtoq4Pf.mp3',
+  'sfx:drumroll': '/assets/drumroll-BzHoJfte.mp3',
+  'sfx:pen_scribble': '/assets/pen_scribble-BM1Jp2uD.mp3',
   'sfx:jingle_win': '/assets/jingle_win-DqlQ62Fq.mp3',
   'sfx:jingle_lose': '/assets/jingle_lose-gAS4mNKd.mp3',
 };
@@ -367,7 +370,7 @@ export class SoundEngine {
   }
 
   drumroll(): void {
-    this.playNoise(0.5, 300, 0.25);
+    this.playAudio('sfx:drumroll', 0.85);
   }
 
   reverseBeeps(n = 4): void {
@@ -375,7 +378,18 @@ export class SoundEngine {
   }
 
   penScribble(): void {
-    this.playNoise(0.18, 1200, 0.2);
+    this.playAudio('sfx:pen_scribble', 0.85);
+  }
+
+  playWinnerVoice(winnerId: string): void {
+    if (this.muted) return;
+    if (winnerId === 'ravi') {
+      this.playVoice('raviwin');
+    } else if (winnerId === 'amit') {
+      this.playVoice('amitwin');
+    } else {
+      this.playVoice(winnerId);
+    }
   }
 
   // Voice Announcer

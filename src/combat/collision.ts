@@ -84,7 +84,7 @@ export function canStrikeHit(attacker: FighterState, defender: FighterState): { 
 
 export function isDefenderBlocking(defender: FighterState, attackHeight: HitHeight): boolean {
   if (!defender.canBlock || !defender.holdingBack || defender.airborne) return false;
-  if (defender.crouching) return attackHeight === 'low';
+  if (defender.crouching) return attackHeight === 'low' || attackHeight === 'mid';
   return attackHeight === 'high' || attackHeight === 'mid';
 }
 
