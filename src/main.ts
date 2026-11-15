@@ -16,6 +16,7 @@ import {
 } from './data/fighters.ts';
 import { FightCamera } from './render/camera.ts';
 import { getFighterPortraitUrl, populateAllPortraits } from './render/portraits.ts';
+import { MultiplayerClient } from './multiplayer/room.ts';
 import { HudController } from './ui/hud.ts';
 import { InputManager } from './ui/input.ts';
 import { NewsdeskController } from './ui/newsdesk.ts';
@@ -37,6 +38,7 @@ class SansadShowdownApp {
   private readonly hud = new HudController();
   private readonly news = new NewsdeskController();
   private readonly resultScreen = new ResultScreen();
+  private readonly multiplayer = new MultiplayerClient();
 
   private currentScreen: ScreenName = 'loading';
   private battle: BattleEngine | null = null;
@@ -253,6 +255,7 @@ class SansadShowdownApp {
           if (opp === this.p1Pick) opp = PLAYABLE_WITHOUT_BOSS[(PLAYABLE_WITHOUT_BOSS.indexOf(opp) + 1) % PLAYABLE_WITHOUT_BOSS.length];
           this.p2Pick = opp;
           this.syncSelectUI();
+          this.startAttractScene();
           return;
         }
         if (key in FIGHTERS) {
@@ -266,6 +269,7 @@ class SansadShowdownApp {
             this.pickTurn = 'p1';
           }
           this.syncSelectUI();
+          this.startAttractScene();
         }
       });
     });
@@ -330,6 +334,7 @@ class SansadShowdownApp {
         this.p1Pick = ROSTER_ORDER[(idx + dir + ROSTER_ORDER.length) % ROSTER_ORDER.length];
         this.audio.uiSelect();
         this.syncSelectUI();
+        this.startAttractScene();
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const idx = ROSTER_ORDER.indexOf(this.p2Pick);
@@ -337,6 +342,7 @@ class SansadShowdownApp {
         this.p2Pick = ROSTER_ORDER[(idx + dir + ROSTER_ORDER.length) % ROSTER_ORDER.length];
         this.audio.uiSelect();
         this.syncSelectUI();
+        this.startAttractScene();
       } else if (e.key.toLowerCase() === 't') {
         const order: StageId[] = ['sansad', 'jantar', 'road'];
         this.stagePick = order[(order.indexOf(this.stagePick) + 1) % order.length];
@@ -514,30 +520,64 @@ class SansadShowdownApp {
 
     document.getElementById('online-leave')?.addEventListener('click', () => {
       this.local2pMode = false;
+      this.multiplayer.cleanup();
       this.syncSelectUI();
     });
 
-    hostBtn?.addEventListener('click', () => {
+    this.multiplayer.onStateChange = (state, detail) => {
+      const waitEl = hostingPanel?.querySelector('.on-wait');
+      if (state === 'connected') {
+        if (waitEl) waitEl.innerHTML = `<span class="dot" style="background:#22c55e"></span> Opponent Connected via WebRTC! Press FIGHT!`;
+        this.audio.uiConfirm();
+      } else if (state === 'hosting' && waitEl && detail) {
+        waitEl.innerHTML = `<span class="dot"></span> ${detail}`;
+      }
+    };
+
+    hostBtn?.addEventListener('click', async () => {
       this.audio.uiConfirm();
-      // Enable Instant Local 2P Versus mode + display room code
-      this.local2pMode = true;
-      const code = Math.random().toString(36).slice(2, 6).toUpperCase();
-      if (roomCodeEl) roomCodeEl.textContent = code;
       homePanel?.classList.add('hidden');
       hostingPanel?.classList.remove('hidden');
       const waitEl = hostingPanel?.querySelector('.on-wait');
       if (waitEl) {
-        waitEl.innerHTML = `<span class="dot"></span> Local 2P Couch Versus ready! Close modal &amp; press FIGHT!`;
+        waitEl.innerHTML = `<span class="dot"></span> Connecting to signaling server...`;
       }
-      this.syncSelectUI();
+      try {
+        const code = await this.multiplayer.host();
+        if (roomCodeEl) roomCodeEl.textContent = code;
+        if (waitEl) {
+          waitEl.innerHTML = `<span class="dot"></span> Online Room <b>${code}</b> created! Waiting for peer...<br/><small style="opacity:0.75">(Or close modal to play Local 2P couch mode)</small>`;
+        }
+        this.local2pMode = true;
+        this.syncSelectUI();
+      } catch {
+        // Fallback to local 2P
+        const code = Math.random().toString(36).slice(2, 6).toUpperCase();
+        if (roomCodeEl) roomCodeEl.textContent = code;
+        if (waitEl) {
+          waitEl.innerHTML = `<span class="dot"></span> Local 2P Couch Mode active! (P1: WASD+JKL, P2: Arrows+Numpad)`;
+        }
+        this.local2pMode = true;
+        this.syncSelectUI();
+      }
     });
 
-    joinForm?.addEventListener('submit', (e) => {
+    joinForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
       this.audio.uiConfirm();
-      this.local2pMode = true;
-      onlineEl?.classList.add('hidden');
-      this.syncSelectUI();
+      const codeInput = document.getElementById('on-code') as HTMLInputElement | null;
+      const code = codeInput?.value?.trim().toUpperCase();
+      if (!code) return;
+      try {
+        await this.multiplayer.join(code);
+        this.local2pMode = true;
+        onlineEl?.classList.add('hidden');
+        this.syncSelectUI();
+      } catch {
+        this.local2pMode = true;
+        onlineEl?.classList.add('hidden');
+        this.syncSelectUI();
+      }
     });
   }
 

@@ -187,6 +187,11 @@ export class BattleEngine {
       this.hud.speech(this.p1, this.p1.char.introLine);
       this.hud.speech(this.p2, this.p2.char.introLine);
       this.hud.announce(this.match.roundTitle, 'READY YOUR NETAS!');
+      if (this.opts.isBossMatch || this.opts.p2Id === 'mbapu') {
+        this.audio.playVoice('mbapuintro');
+      } else {
+        this.audio.playVoice(this.p1.char.id);
+      }
       this.audio.announce('round_1');
     } else {
       this.startRoundCall();
@@ -218,6 +223,7 @@ export class BattleEngine {
     caster.forceState('super');
     target.forceState('frozen');
     this.phase = 'super';
+    this.audio.playVoice(caster.char.id);
     this.hud.showSuperBanner(caster.char.superName);
     this.news.reportEvent('super', caster.char.id, target.char.id);
     this.seq = createSuperSequence({
@@ -683,6 +689,7 @@ export class BattleEngine {
             if (Math.abs(f.x - this.mithai.x) < 0.72 && f.y < 0.8) {
               f.applyMithaiBuff();
               this.audio.kaching();
+              this.audio.playVoice('gulaam');
               this.hud.popup('SOAN PAPDI BOOST! +HP', new THREE.Vector3(f.x, 2.2, 0.2), '#ffd23f');
               this.mithai.done = true;
               break;
@@ -744,6 +751,7 @@ export class BattleEngine {
       this.hud.announce(perfect ? 'PERFECT!' : `${winF.char.name} WINS!`, winF.char.winLine);
       this.hud.speech(winF, winF.char.winLine);
       this.audio.matchJingle(rec.matchWinner === 0);
+      this.audio.playWinnerVoice(winF.char.id);
       if (perfect) this.audio.announce('perfect');
     } else {
       this.startRoundCall();
